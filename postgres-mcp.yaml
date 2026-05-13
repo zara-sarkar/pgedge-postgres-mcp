@@ -1,0 +1,40 @@
+databases:
+  - name: "dev_db"
+    host: "localhost" 
+    port: 5433
+    database: "makeup"
+    user: "zsarkar01"     # Resetting to default postgres user
+    password: "" # <--- eft blsnk since we're in trust mode rn
+    sslmode: "disable"
+    allow_writes: true
+
+http:
+  enabled: true
+  address: ":8080"
+  auth:
+    enabled: false
+
+llm:
+  enabled: true
+  provider: "ollama"
+  model: "llama3.1"
+  ollama_url: "http://172.28.240.1:11434"
+
+embedding:
+  enabled: true
+  provider: "ollama"
+  model: "nomic-embed-text"
+  ollama_url: "http://172.28.240.1:11434"
+
+knowledgebase:
+  enabled: true
+  embedding_provider: "ollama"
+  embedding_model: "nomic-embed-text"
+  embedding_ollama_url: "http://172.28.240.1:11434"
+
+builtins:
+  tools:
+    query_database: true
+    get_schema_info: true
+    similarity_search: true
+    count_rows: true
