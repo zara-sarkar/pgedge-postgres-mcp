@@ -441,6 +441,9 @@ type EmbeddingConfig struct {
 	OpenAIAPIKeyFile string `yaml:"openai_api_key_file"` // Path to file containing OpenAI API key
 	OpenAIBaseURL    string `yaml:"openai_base_url"`     // Base URL for OpenAI API (default: https://api.openai.com/v1)
 	OllamaURL        string `yaml:"ollama_url"`          // URL for Ollama service (default: http://localhost:11434)
+	// === ADD EMBEDDING BINDINGS HERE ===
+	GeminiAPIKey     string `yaml:"gemini_api_key"`
+	GeminiBaseURL    string `yaml:"gemini_base_url"`
 }
 
 // LLMConfig holds LLM configuration for web client chat proxy
@@ -454,6 +457,10 @@ type LLMConfig struct {
 	OpenAIAPIKey        string  `yaml:"openai_api_key"`         // API key for OpenAI (direct - discouraged, use api_key_file or env var instead)
 	OpenAIAPIKeyFile    string  `yaml:"openai_api_key_file"`    // Path to file containing OpenAI API key
 	OpenAIBaseURL       string  `yaml:"openai_base_url"`        // Base URL for OpenAI API (default: https://api.openai.com)
+	// === ADD NATIVE GEMINI EXTENSIONS HERE ===
+	GeminiAPIKey        string  `yaml:"gemini_api_key"`        
+	GeminiAPIKeyFile    string  `yaml:"gemini_api_key_file"`   
+	GeminiBaseURL       string  `yaml:"gemini_base_url"`
 	OllamaURL           string  `yaml:"ollama_url"`             // URL for Ollama service (default: http://localhost:11434)
 	MaxTokens           int     `yaml:"max_tokens"`             // Maximum tokens for LLM response (default: 4096)
 	Temperature         float64 `yaml:"temperature"`            // Temperature for LLM sampling (default: 0.7)
@@ -474,6 +481,11 @@ type KnowledgebaseConfig struct {
 	EmbeddingOpenAIAPIKeyFile string `yaml:"embedding_openai_api_key_file"` // Path to file containing OpenAI API key
 	EmbeddingOpenAIBaseURL    string `yaml:"embedding_openai_base_url"`     // Base URL for OpenAI API (default: https://api.openai.com/v1)
 	EmbeddingOllamaURL        string `yaml:"embedding_ollama_url"`          // URL for Ollama service (default: http://localhost:11434)
+
+	// === ADD NATIVE GEMINI EXTENSIONS HERE ===
+	EmbeddingGeminiAPIKey     string `yaml:"embedding_gemini_api_key"`      // API key for Google Gemini
+	EmbeddingGeminiAPIKeyFile string `yaml:"embedding_gemini_api_key_file"`  // Path to file containing Gemini API key
+	EmbeddingGeminiBaseURL    string `yaml:"embedding_gemini_base_url"`     // Base URL for Gemini API (optional)
 }
 
 // LoadConfig loads configuration with proper priority:
@@ -601,6 +613,9 @@ func defaultConfig() *Config {
 			Model:        "nomic-embed-text",       // Default Ollama model
 			VoyageAPIKey: "",                       // Must be provided if using Voyage AI
 			OllamaURL:    "http://localhost:11434", // Default Ollama URL
+			// === ADD INITIALIZER DEFAULTS FOR GEMINI ===
+			GeminiAPIKey:  "",
+			GeminiBaseURL: "https://generativelanguage.googleapis.com", // Points to the stable native gateway
 		},
 		LLM: LLMConfig{
 			Enabled:         false,                    // Disabled by default (opt-in)
@@ -609,6 +624,10 @@ func defaultConfig() *Config {
 			AnthropicAPIKey: "",                       // Must be provided if using Anthropic
 			OpenAIAPIKey:    "",                       // Must be provided if using OpenAI
 			OllamaURL:       "http://localhost:11434", // Default Ollama URL
+			// === ADD INITIALIZER DEFAULTS FOR GEMINI ===
+			GeminiAPIKey:    "",
+			GeminiBaseURL:   "https://generativelanguage.googleapis.com",
+			GeminiModel:     "gemini-2.5-flash",
 			MaxTokens:       4096,                     // Default max tokens
 			Temperature:     0.7,                      // Default temperature
 		},
@@ -620,6 +639,9 @@ func defaultConfig() *Config {
 			EmbeddingOllamaURL:    "http://localhost:11434", // Default Ollama URL
 			EmbeddingVoyageAPIKey: "",                       // Must be provided if using Voyage
 			EmbeddingOpenAIAPIKey: "",                       // Must be provided if using OpenAI
+			// === ADD INITIALIZER DEFAULTS FOR GEMINI ===
+			EmbeddingGeminiAPIKey: "",
+			EmbeddingGeminiBaseURL: "https://generativelanguage.googleapis.com",
 		},
 		SecretFile: "", // Will be set to default path if not specified
 	}
@@ -746,6 +768,16 @@ func mergeConfig(dest, src *Config) {
 		}
 		if src.LLM.OpenAIBaseURL != "" {
 			dest.LLM.OpenAIBaseURL = src.LLM.OpenAIBaseURL
+		}
+		// === ADD NATIVE MERGE HANDLERS HERE ===
+		if src.LLM.GeminiAPIKey != "" {
+			dest.LLM.GeminiAPIKey = src.LLM.GeminiAPIKey
+		}
+		if src.LLM.GeminiAPIKeyFile != "" {
+			dest.LLM.GeminiAPIKeyFile = src.LLM.GeminiAPIKeyFile
+		}
+		if src.LLM.GeminiBaseURL != "" {
+			dest.LLM.GeminiBaseURL = src.LLM.GeminiBaseURL
 		}
 		if src.LLM.OllamaURL != "" {
 			dest.LLM.OllamaURL = src.LLM.OllamaURL
@@ -1011,12 +1043,22 @@ func applyEnvironmentVariables(cfg *Config) {
 	// 1. Try environment variables first (PGEDGE_ prefixed, then standard)
 	setStringFromEnvWithFallback(&cfg.LLM.AnthropicAPIKey, "PGEDGE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY")
 	setStringFromEnvWithFallback(&cfg.LLM.OpenAIAPIKey, "PGEDGE_OPENAI_API_KEY", "OPENAI_API_KEY")
+
+	// === ADD NATIVE GEMINI ENV FALLBACKS HERE ===
+	setStringFromEnvWithFallback(&cfg.LLM.GeminiAPIKey, "PGEDGE_GEMINI_API_KEY", "GEMINI_API_KEY")
+
 	// 2. If env vars not set and api_key_file is specified, load from file
 	if cfg.LLM.AnthropicAPIKey == "" && cfg.LLM.AnthropicAPIKeyFile != "" {
 		if key, err := readAPIKeyFromFile(cfg.LLM.AnthropicAPIKeyFile); err == nil && key != "" {
 			cfg.LLM.AnthropicAPIKey = key
 		}
 		// Note: errors are silently ignored - file may not exist and that's ok
+	}
+	// === ADD FILE KEY FALLBACK CHECK HERE ===
+	if cfg.LLM.GeminiAPIKey == "" && cfg.LLM.GeminiAPIKeyFile != "" {
+		if key, err := readAPIKeyFromFile(cfg.LLM.GeminiAPIKeyFile); err == nil && key != "" {
+			cfg.LLM.GeminiAPIKey = key
+		}
 	}
 	if cfg.LLM.OpenAIAPIKey == "" && cfg.LLM.OpenAIAPIKeyFile != "" {
 		if key, err := readAPIKeyFromFile(cfg.LLM.OpenAIAPIKeyFile); err == nil && key != "" {

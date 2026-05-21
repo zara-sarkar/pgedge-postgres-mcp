@@ -64,6 +64,10 @@ func GenerateEmbeddingTool(cfg *config.Config) Tool {
 				OpenAIAPIKey:  cfg.Embedding.OpenAIAPIKey,
 				OpenAIBaseURL: cfg.Embedding.OpenAIBaseURL,
 				OllamaURL:     cfg.Embedding.OllamaURL,
+
+				// === MULTIPLEX THE NEW PROPERTY SLOTS HERE ===
+				GeminiAPIKey:  cfg.Embedding.GeminiAPIKey,
+				GeminiBaseURL: cfg.Embedding.GeminiBaseURL,
 			}
 
 			provider, err := embedding.NewProvider(embCfg)

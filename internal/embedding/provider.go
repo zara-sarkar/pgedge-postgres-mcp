@@ -43,6 +43,10 @@ type Config struct {
 	OpenAIAPIKey  string
 	OpenAIBaseURL string // Base URL for OpenAI API (optional, uses default if empty)
 
+	// Gemini-specific
+	GeminiAPIKey  string
+	GeminiBaseURL string // Base URL for Gemini API (optional, uses default if empty)
+
 	// Ollama-specific
 	OllamaURL string
 }
@@ -61,6 +65,12 @@ func NewProvider(cfg Config) (Provider, error) {
 			return nil, fmt.Errorf("OpenAI API key is required when provider is 'openai'")
 		}
 		return NewOpenAIProvider(cfg.OpenAIAPIKey, cfg.Model, cfg.OpenAIBaseURL)
+		
+	case "gemini":
+		if cfg.GeminiAPIKey == "" {
+			return nil, fmt.Errorf("Gemini API key is required when provider is 'gemini'")
+		}
+		return NewGeminiProvider(cfg.GeminiAPIKey, cfg.Model, cfg.GeminiBaseURL)
 
 	case "ollama":
 		if cfg.OllamaURL == "" {

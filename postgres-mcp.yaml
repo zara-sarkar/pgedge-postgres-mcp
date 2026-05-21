@@ -1,10 +1,10 @@
 databases:
-  - name: "dev_db"
-    host: "localhost" 
-    port: 5433
+  - name: "makeup_db"
+    host: "127.0.0.1"
+    port: 5432
     database: "makeup"
-    user: "zsarkar01"     # Resetting to default postgres user
-    password: "" # <--- eft blsnk since we're in trust mode rn
+    user: "zsarkar01"
+    password: ""
     sslmode: "disable"
     allow_writes: true
 
@@ -12,29 +12,30 @@ http:
   enabled: true
   address: ":8080"
   auth:
-    enabled: false
+    enabled: false # Perfect! Authentication is bypassed
+    token_file: "./pgedge-postgres-mcp-tokens.yaml"
 
-llm:
-  enabled: true
-  provider: "ollama"
-  model: "llama3.1"
-  ollama_url: "http://172.28.240.1:11434"
+user_file: "./pgedge-postgres-mcp-users.yaml"
 
-embedding:
-  enabled: true
-  provider: "ollama"
-  model: "nomic-embed-text"
-  ollama_url: "http://172.28.240.1:11434"
+services:
+  llm:
+    provider: "ollama"
+    model: "qwen2.5:3b" # Updated to your new tiny model!
+    url: "http://127.0.0.1:11434"
+  embedding:
+    enabled: true
+    provider: "ollama"
+    model: "all-minilm" 
+    url: "http://127.0.0.1:11434"
 
 knowledgebase:
   enabled: true
   embedding_provider: "ollama"
-  embedding_model: "nomic-embed-text"
-  embedding_ollama_url: "http://172.28.240.1:11434"
+  embedding_model: "all-minilm" 
+  embedding_ollama_url: "http://127.0.0.1:11434"
 
-builtins:
-  tools:
-    query_database: true
-    get_schema_info: true
-    similarity_search: true
-    count_rows: true
+llm:
+  enabled: true
+  provider: "ollama"
+  model: "qwen2.5:3b" # Updated to your new tiny model!
+  ollama_url: "http://127.0.0.1:11434"

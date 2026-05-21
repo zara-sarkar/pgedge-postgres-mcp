@@ -144,24 +144,25 @@ class PostgresChatbot:
         tools_context = self.format_tools_for_ollama(tools)
 
         # Create system message with tool information
-        system_message = f"""You are a helpful PostgreSQL database assistant. You have access to the following tools:
+        system_message = f"""You are a strict PostgreSQL database agent. You do not talk to the user about beauty trends. You only run tools.
 
-{tools_context}
+        AVAILABLE DATABASE TOOLS:
+        {tools_context}
 
-IMPORTANT INSTRUCTIONS:
-1. When you need to use a tool, respond with ONLY a JSON object - no other text before or after:
-{{
-    "tool": "tool_name",
-    "arguments": {{
-        "param1": "value1",
-        "param2": "value2"
-    }}
-}}
+        CRITICAL INSTRUCTIONS:
+        1. Every time the user asks a question, your ONLY allowed action is to choose a tool and respond with a JSON block.
+        2. If you do not output JSON, you have failed your job.
+        3. You must output the JSON block with NO introductory or concluding text. Do not say "Here is the tool call".
 
-2. After calling a tool, you will receive actual results from the database.
-3. You MUST base your response ONLY on the actual tool results provided - never make up or guess data.
-4. If you receive tool results, format them clearly for the user.
-5. Only use tools when necessary to answer the user's question."""
+        Your response MUST look exactly like this example, with no other words:
+        {{
+            "tool": "tool_name",
+            "arguments": {{
+                "param1": "value1"
+            }}
+        }}
+
+        4. After you receive a "Tool result", write a concise final answer using ONLY the factual data returned in that result. Never hallucinate brand names or products."""
 
         # Add user query to messages
         messages.append({
