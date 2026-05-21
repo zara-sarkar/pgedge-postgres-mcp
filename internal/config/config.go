@@ -627,7 +627,6 @@ func defaultConfig() *Config {
 			// === ADD INITIALIZER DEFAULTS FOR GEMINI ===
 			GeminiAPIKey:    "",
 			GeminiBaseURL:   "https://generativelanguage.googleapis.com",
-			GeminiModel:     "gemini-2.5-flash",
 			MaxTokens:       4096,                     // Default max tokens
 			Temperature:     0.7,                      // Default temperature
 		},
