@@ -627,8 +627,8 @@ func generateQueryEmbeddingWithConfig(serverCfg *config.Config, queryText string
 		OllamaURL:     serverCfg.Embedding.OllamaURL,
 
 			// === MULTIPLEX THE NEW PROPERTY SLOTS HERE ===
-		GeminiAPIKey:  cfg.Embedding.GeminiAPIKey,
-		GeminiBaseURL: cfg.Embedding.GeminiBaseURL,
+		GeminiAPIKey:  serverCfg.Embedding.GeminiAPIKey, 
+		GeminiBaseURL: serverCfg.Embedding.GeminiBaseURL,
 	}
 
 	provider, err := embedding.NewProvider(embCfg)

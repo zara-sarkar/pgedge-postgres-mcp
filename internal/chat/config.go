@@ -59,6 +59,9 @@ type LLMConfig struct {
 	OllamaURL           string  `yaml:"ollama_url"`             // Ollama server URL
 	MaxTokens           int     `yaml:"max_tokens"`             // Max tokens for response
 	Temperature         float64 `yaml:"temperature"`            // Temperature for sampling
+
+	GeminiAPIKey     string  `yaml:"gemini_api_key"`
+	GeminiBaseURL    string  `yaml:"gemini_base_url"`
 }
 
 // UIConfig holds UI configuration
@@ -91,6 +94,10 @@ func LoadConfig(configPath string) (*Config, error) {
 			OpenAIAPIKey:     getEnvWithFallback("PGEDGE_OPENAI_API_KEY", "OPENAI_API_KEY"),
 			OpenAIBaseURL:    os.Getenv("PGEDGE_OPENAI_BASE_URL"), // Empty string uses default
 			OllamaURL:        getEnvOrDefault("PGEDGE_OLLAMA_URL", "http://localhost:11434"),
+
+			// === ADD GEMINI ENVIRONMENT VARIABLE FALLBACKS HERE ===
+			GeminiAPIKey:     getEnvWithFallback("PGEDGE_GEMINI_API_KEY", "GEMINI_API_KEY"),
+			GeminiBaseURL:    os.Getenv("PGEDGE_GEMINI_BASE_URL"),
 			MaxTokens:        4096,
 			Temperature:      0.7,
 		},
@@ -138,6 +145,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		}
 		// Note: errors are silently ignored - file may not exist and that's ok
 	}
+	
 	// 2. Direct config value (if set) is already in cfg.LLM.AnthropicAPIKey/OpenAIAPIKey from loadConfigFile
 
 	// Load authentication token with priority
@@ -218,6 +226,14 @@ func (c *Config) Validate() error {
 		if c.LLM.Model == "" {
 			c.LLM.Model = "gpt-4o"
 		}
+	// === ADD GEMINI VALIDATION CASES HERE ===
+	case "gemini":
+		if c.LLM.GeminiAPIKey == "" {
+			return fmt.Errorf("PGEDGE_GEMINI_API_KEY environment variable or gemini_api_key config is required for Gemini")
+		}
+		if c.LLM.Model == "" {
+			c.LLM.Model = "gemini-2.5-flash"
+		}
 	default:
 		if c.LLM.OllamaURL == "" {
 			c.LLM.OllamaURL = "http://localhost:11434"
@@ -240,6 +256,8 @@ func (c *Config) IsProviderConfigured(provider string) bool {
 	case "ollama":
 		// Ollama is configured if URL is set (defaults to localhost)
 		return c.LLM.OllamaURL != ""
+	case "gemini":
+		return c.LLM.GeminiAPIKey != ""
 	default:
 		return false
 	}
@@ -254,6 +272,9 @@ func (c *Config) GetConfiguredProviders() []string {
 	}
 	if c.IsProviderConfigured("openai") {
 		providers = append(providers, "openai")
+	}
+	if c.IsProviderConfigured("gemini") {
+		providers = append(providers, "gemini")
 	}
 	if c.IsProviderConfigured("ollama") {
 		providers = append(providers, "ollama")

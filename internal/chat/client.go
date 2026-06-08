@@ -380,6 +380,12 @@ func (c *Client) initializeLLM() error {
 		if clientErr != nil {
 			return fmt.Errorf("failed to create OpenAI client: %w", clientErr)
 		}
+	case "gemini": 
+		tempClient, clientErr = NewGeminiClient(
+			c.config.LLM.GeminiAPIKey, c.config.LLM.GeminiBaseURL, "", 0, 0, false)
+		if clientErr != nil {
+			return fmt.Errorf("failed to create Gemini client: %w", clientErr)
+		}
 	case "ollama":
 		tempClient = NewOllamaClient(
 			c.config.LLM.OllamaURL, "", false)
@@ -450,6 +456,18 @@ func (c *Client) initializeLLM() error {
 		)
 		if clientErr != nil {
 			return fmt.Errorf("failed to create OpenAI client: %w", clientErr)
+		}
+	case "gemini":
+		c.llm, clientErr = NewGeminiClient(
+			c.config.LLM.GeminiAPIKey,
+			c.config.LLM.GeminiBaseURL,
+			c.config.LLM.Model,
+			c.config.LLM.MaxTokens,
+			c.config.LLM.Temperature,
+			c.config.UI.Debug,
+		)
+		if clientErr != nil {
+			return fmt.Errorf("failed to create Gemini client: %w", clientErr)
 		}
 	case "ollama":
 		c.llm = NewOllamaClient(
@@ -1296,6 +1314,8 @@ func getDefaultModelForProvider(provider string) string {
 		return "claude-sonnet-4-5-20250929"
 	case "openai":
 		return "gpt-4o"
+	case "gemini":
+		return "gemini-2.5-flash"
 	case "ollama":
 		return "qwen3-coder:latest"
 	default:

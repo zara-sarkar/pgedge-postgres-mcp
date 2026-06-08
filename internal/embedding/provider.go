@@ -65,7 +65,7 @@ func NewProvider(cfg Config) (Provider, error) {
 			return nil, fmt.Errorf("OpenAI API key is required when provider is 'openai'")
 		}
 		return NewOpenAIProvider(cfg.OpenAIAPIKey, cfg.Model, cfg.OpenAIBaseURL)
-		
+
 	case "gemini":
 		if cfg.GeminiAPIKey == "" {
 			return nil, fmt.Errorf("Gemini API key is required when provider is 'gemini'")
@@ -82,6 +82,6 @@ func NewProvider(cfg Config) (Provider, error) {
 		return NewOllamaProvider(cfg.OllamaURL, cfg.Model)
 
 	default:
-		return nil, fmt.Errorf("unsupported embedding provider: %s (supported: voyage, openai, ollama)", cfg.Provider)
+		return nil, fmt.Errorf("unsupported embedding provider: %s (supported: voyage, openai, gemini, ollama)", cfg.Provider)
 	}
 }

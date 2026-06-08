@@ -880,6 +880,8 @@ func main() {
 					OpenAIAPIKey:     cfg.LLM.OpenAIAPIKey,
 					OpenAIBaseURL:    cfg.LLM.OpenAIBaseURL,
 					OllamaURL:        cfg.LLM.OllamaURL,
+					GeminiAPIKey:     cfg.LLM.GeminiAPIKey,     // Added for Gemini integration
+        			GeminiBaseURL:    cfg.LLM.GeminiBaseURL,
 					MaxTokens:        cfg.LLM.MaxTokens,
 					Temperature:      cfg.LLM.Temperature,
 				}
