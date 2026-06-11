@@ -1682,23 +1682,8 @@ func (c *geminiClient) SetReadOnlyMode(readOnly bool) {
 // Chat generates a conversational completion response matching the interface requirements
 func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools interface{}) (LLMResponse, error) {
 	startTime := time.Now()
-    operation := "chat"
-    targetURL := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
-
-    //  ADD THIS RUNTIME DUMP BLOCK
-    fmt.Printf("\n================= [DEBUG-CHAT RUNTIME] ===============\n")
-    fmt.Printf("Instance API Key Length: %d\n", len(c.apiKey))
-    if len(c.apiKey) >= 4 {
-        fmt.Printf("Instance API Key Preview: %s...\n", c.apiKey[:4])
-    }
-    fmt.Printf("Final Outbound Target URL: %s\n", targetURL)
-    
-    // Check if the API key parameter got stripped or went missing inside the string
-    if !strings.Contains(targetURL, "?key=AQ") && !strings.Contains(targetURL, "?key=AIza") {
-        fmt.Println(" CRITICAL WARNING: The API key parameter looks malformed or missing in targetURL!")
-    }
-    fmt.Printf("======================================================\n\n")
-    //  END OF RUNTIME DUMP BLOCK
+	operation := "chat"
+	targetURL := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
 
 	// 1. Resolve and form baseline system instructions
 	systemContent := `You are a helpful PostgreSQL database assistant with expert knowledge on PostgreSQL and products from pgEdge with access to MCP tools.
@@ -1714,9 +1699,23 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 		systemContent += readOnlySafetyPrompt
 	}
 
-	// 2. Define inline matching types mirroring the structure of Google's API schema
+	// 2. Define standard inline types mirroring Google's API schema completely
+	type functionDeclaration struct {
+		Name        string                 `json:"name"`
+		Description string                 `json:"description"`
+		Parameters  map[string]interface{} `json:"parameters,omitempty"`
+	}
+	type toolContainer struct {
+		FunctionDeclarations []functionDeclaration `json:"functionDeclarations"`
+	}
+	type functionCall struct {
+		Name string                 `json:"name"`
+		Args map[string]interface{} `json:"args"`
+		ID   string                 `json:"id,omitempty"`
+	}
 	type part struct {
-		Text string `json:"text,omitempty"`
+		Text         string        `json:"text,omitempty"`
+		FunctionCall *functionCall `json:"functionCall,omitempty"`
 	}
 	type contentBlock struct {
 		Role  string `json:"role"`
@@ -1732,18 +1731,54 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 	type geminiPayload struct {
 		Contents          []contentBlock  `json:"contents"`
 		SystemInstruction *sysInstruction `json:"systemInstruction,omitempty"`
+		Tools             []toolContainer `json:"tools,omitempty"`
 		GenerationConfig  configBlock     `json:"generationConfig"`
 	}
 
-	// 3. Translate abstract chat.Message arrays into Gemini raw structures
+	// 3. Convert interface{} tools to Gemini format via []mcp.Tool intermediate JSON mapping
+	var geminiTools []toolContainer
+	if tools != nil {
+		var mcpTools []mcp.Tool
+		toolsJSON, err := json.Marshal(tools)
+		if err == nil {
+			if err := json.Unmarshal(toolsJSON, &mcpTools); err == nil && len(mcpTools) > 0 {
+				var decls []functionDeclaration
+				for _, t := range mcpTools {
+					// Build a strict JSON Schema object constraint layout
+					params := map[string]interface{}{
+						"type": "object",
+					}
+					
+					// Transfer specific properties if they exist natively
+					if t.InputSchema.Properties != nil && len(t.InputSchema.Properties) > 0 {
+						params["properties"] = t.InputSchema.Properties
+						if len(t.InputSchema.Required) > 0 {
+							params["required"] = t.InputSchema.Required
+						}
+					} else {
+						// 💡 CRITICAL FIX: Explicitly enforce an empty schema structure to block 
+						// Google's API Gateway from complaining about hallucinated default parameters.
+						params["properties"] = map[string]interface{}{}
+					}
+
+					decls = append(decls, functionDeclaration{
+						Name:        t.Name,
+						Description: t.Description,
+						Parameters:  params,
+					})
+				}
+				geminiTools = []toolContainer{{FunctionDeclarations: decls}}
+			}
+		}
+	}
+
+	// 4. Translate abstract chat.Message arrays into Gemini raw structures
 	var geminiContents []contentBlock
 	for _, m := range messages {
 		role := m.Role
 		if role == "assistant" {
-			role = "model" // Gemini maps assistant role -> 'model'
+			role = "model"
 		} else if role == "system" || role == "tool" {
-			// System instructions are passed separately in Gemini.
-			// Tool results are handled as text payload blocks here.
 			role = "user"
 		}
 
@@ -1773,10 +1808,15 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 						Parts: []part{{Text: v.Text}},
 					})
 				case ToolUse:
-					argsJSON, _ := json.Marshal(v.Input)
 					geminiContents = append(geminiContents, contentBlock{
-						Role:  "model",
-						Parts: []part{{Text: fmt.Sprintf("Using tool: %s with args: %s", v.Name, string(argsJSON))}},
+						Role: "model",
+						Parts: []part{{
+							FunctionCall: &functionCall{
+								Name: v.Name,
+								Args: v.Input,
+								ID:   v.ID,
+							},
+						}},
 					})
 				case ToolResult:
 					contentStr := extractTextFromContent(v.Content)
@@ -1805,6 +1845,7 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 
 	payload := geminiPayload{
 		Contents: geminiContents,
+		Tools:    geminiTools,
 		GenerationConfig: configBlock{
 			MaxOutputTokens: c.maxTokens,
 			Temperature:     c.temperature,
@@ -1824,9 +1865,17 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 		return LLMResponse{}, fmt.Errorf("failed to marshal Gemini request payload: %w", err)
 	}
 
+	// ---------------------------------------------------------------------------
+	// 🔍 DEBUG TRACE: OUTBOUND REQUEST PAYLOAD TO GOOGLE
+	// ---------------------------------------------------------------------------
+	fmt.Printf("\n--- 🛰️  RAW INBOUND GEMINI REQUEST TRACE ---\n")
+	fmt.Printf("Endpoint Target URL: %s\n", targetURL)
+	fmt.Printf("Request Payload Body:\n%s\n", string(bodyBytes))
+	fmt.Printf("------------------------------------------------------\n\n")
+	// ---------------------------------------------------------------------------
+
 	embedding.LogLLMRequestTrace("gemini", c.model, operation, string(bodyBytes))
 
-	// 4. Fire Context-Aware Request via HTTP Client
 	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		duration := time.Since(startTime)
@@ -1851,6 +1900,15 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 		return LLMResponse{}, fmt.Errorf("failed to read Gemini network response stream: %w", err)
 	}
 
+	// ---------------------------------------------------------------------------
+	// 🔍 DEBUG TRACE: INBOUND RESPONSE PAYLOAD FROM GOOGLE
+	// ---------------------------------------------------------------------------
+	fmt.Printf("\n--- 🛠️  RAW OUTBOUND GEMINI BACKEND RESPONSE TRACE ---\n")
+	fmt.Printf("HTTP Status Code: %d\n", resp.StatusCode)
+	fmt.Printf("Payload Body:\n%s\n", string(respBody))
+	fmt.Printf("------------------------------------------------------\n\n")
+	// ---------------------------------------------------------------------------
+
 	if resp.StatusCode != http.StatusOK {
 		duration := time.Since(startTime)
 		apiErr := fmt.Errorf("Gemini backend service error response (%d): %s", resp.StatusCode, string(respBody))
@@ -1858,13 +1916,14 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 		return LLMResponse{}, apiErr
 	}
 
-	// 5. Decode output candidate arrays
-	type responsePart struct {
-		Text string `json:"text"`
+	// 5. Build full matching structures for parsing inbound functional text layouts
+	type respPart struct {
+		Text         string        `json:"text,omitempty"`
+		FunctionCall *functionCall `json:"functionCall,omitempty"`
 	}
 	type candidateBlock struct {
 		Content struct {
-			Parts []responsePart `json:"parts"`
+			Parts []respPart `json:"parts"`
 		} `json:"content"`
 		FinishReason string `json:"finishReason"`
 	}
@@ -1886,7 +1945,7 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 		return LLMResponse{}, err
 	}
 
-	outputText := res.Candidates[0].Content.Parts[0].Text
+	firstPart := res.Candidates[0].Content.Parts[0]
 	stopReason := res.Candidates[0].FinishReason
 	if stopReason == "" {
 		stopReason = "end_turn"
@@ -1896,28 +1955,46 @@ func (c *geminiClient) Chat(ctx context.Context, messages []Message, tools inter
 	embedding.LogLLMResponseTrace("gemini", c.model, operation, resp.StatusCode, stopReason)
 	embedding.LogLLMCall("gemini", c.model, operation, 0, 0, duration, nil)
 
-	// Build Token Usage logs for debugging when requested
 	var tokenUsage *TokenUsage
 	if c.debug {
-		tokenUsage = &TokenUsage{
-			Provider: "gemini",
-		}
+		tokenUsage = &TokenUsage{Provider: "gemini"}
 		fmt.Fprintf(os.Stderr, "\r\n[LLM] [DEBUG] Gemini response processed successfully in %v\n", duration)
 	}
 
-	// 6. Return structurally wrapped LLMResponse
+	// 6. Handle tool intent returns gracefully if Gemini triggers a function block
+	if firstPart.FunctionCall != nil {
+		fc := firstPart.FunctionCall
+		callID := fc.ID
+		if callID == "" {
+			callID = fmt.Sprintf("gemini-tool-%d", time.Now().UnixNano())
+		}
+		
+		return LLMResponse{
+			Content: []interface{}{
+				ToolUse{
+					Type:  "tool_use",
+					ID:    callID,
+					Name:  fc.Name,
+					Input: fc.Args,
+				},
+			},
+			StopReason: "tool_use",
+			TokenUsage: tokenUsage,
+		}, nil
+	}
+
+	// 7. Otherwise, standard text response
 	return LLMResponse{
 		Content: []interface{}{
 			TextContent{
 				Type: "text",
-				Text: outputText,
+				Text: firstPart.Text,
 			},
 		},
 		StopReason: stopReason,
 		TokenUsage: tokenUsage,
 	}, nil
 }
-
 // ListModels returns a stable baseline collection of standard models
 func (c *geminiClient) ListModels(ctx context.Context) ([]string, error) {
 	return []string{

@@ -1,3 +1,8 @@
+# ==============================================================================
+# pgEdge Postgres MCP Server Configuration Profile
+# ==============================================================================
+
+# 1. Target Infrastructure Database Connectivity
 databases:
   - name: "makeup_db"
     host: "127.0.0.1"
@@ -8,34 +13,59 @@ databases:
     sslmode: "disable"
     allow_writes: true
 
+# 2. Network Endpoint Runtime Profiles
 http:
   enabled: true
   address: ":8080"
   auth:
-    enabled: false # Perfect! Authentication is bypassed
+    enabled: true
     token_file: "./pgedge-postgres-mcp-tokens.yaml"
 
+# Primary user credential authorization profile
 user_file: "./pgedge-postgres-mcp-users.yaml"
 
+# 3. CRITICAL: Root Embedding Configuration (Parsed by similarity_search.go)
+embedding:
+  enabled: true
+  provider: "ollama"
+  model: "all-minilm:latest"
+  url: "http://localhost:11434"
+  ollama_url: "http://localhost:11434"
+
+# 4. Built-in Tool Controller Matrix
+builtins:
+  tools:
+    query_database: true
+    get_schema_info: true
+    similarity_search: true                  
+    generate_embedding: true                 
+    execute_explain: true
+
+# 5. Native Go Service Router Architecture
 services:
   llm:
-    provider: "ollama"
-    model: "qwen2.5:3b" # Updated to your new tiny model!
-    url: "http://127.0.0.1:11434"
+    provider: "gemini"                       
+    model: "gemini-2.5-flash"
+    gemini_api_key: ""                       # Left blank to automatically trigger your env fallback!
+    gemini_base_url: "https://generativelanguage.googleapis.com" # 💡 Explicitly set here!
   embedding:
     enabled: true
     provider: "ollama"
-    model: "all-minilm" 
-    url: "http://127.0.0.1:11434"
+    model: "all-minilm:latest"
+    url: "http://localhost:11434"
+    ollama_url: "http://localhost:11434"
 
+# 6. Documentation Knowledgebase Search Configurations
 knowledgebase:
   enabled: true
   embedding_provider: "ollama"
-  embedding_model: "all-minilm" 
-  embedding_ollama_url: "http://127.0.0.1:11434"
+  embedding_model: "all-minilm:latest"
+  embedding_ollama_url: "http://localhost:11434"
 
+# 7. Legacy Parameter Mappings (Kept uniform to prevent collision/override glitches)
 llm:
   enabled: true
-  provider: "ollama"
-  model: "qwen2.5:3b" # Updated to your new tiny model!
-  ollama_url: "http://127.0.0.1:11434"
+  provider: "gemini"                         
+  model: "gemini-2.5-flash"
+  gemini_api_key: ""                         # Left blank to match Section 5 fallback chain!
+  gemini_base_url: "https://generativelanguage.googleapis.com" # 💡 Explicitly set here!

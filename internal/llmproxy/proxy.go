@@ -245,6 +245,7 @@ func HandleModels(w http.ResponseWriter, r *http.Request, config *Config) {
 	}
 }
 
+
 // HandleChat handles POST /api/llm/chat
 func HandleChat(w http.ResponseWriter, r *http.Request, config *Config) {
 	if r.Method != http.MethodPost {
@@ -341,6 +342,46 @@ func HandleChat(w http.ResponseWriter, r *http.Request, config *Config) {
 	}
 	requestID := tracing.GenerateRequestID()
 
+	// ---------------------------------------------------------------------------
+	// 💡 CRITICAL TYPE-SAFE FIX: INJECT DEFAULT DATABASE TOOLS IF NOT PROVIDED BY THE UI
+	// ---------------------------------------------------------------------------
+	runtimeTools := req.Tools
+	if runtimeTools == nil || len(runtimeTools) == 0 {
+		runtimeTools = []Tool{
+			{
+				Name:        "get_schema_info",
+				Description: "Retrieve comprehensive schema layouts, structures, and table names for your active pgEdge connected PostgreSQL cluster.",
+				InputSchema: struct {
+					Type       string                 `json:"type"`
+					Properties map[string]interface{} `json:"properties"`
+					Required   []string               `json:"required,omitempty"`
+				}{
+					Type:       "object",
+					Properties: map[string]interface{}{},
+				},
+			},
+			{
+				Name:        "query_database",
+				Description: "Execute an explicit, safe, read-only SQL query statement against target tables.",
+				InputSchema: struct {
+					Type       string                 `json:"type"`
+					Properties map[string]interface{} `json:"properties"`
+					Required   []string               `json:"required,omitempty"`
+				}{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"query": map[string]interface{}{
+							"type":        "string",
+							"description": "The exact valid raw PostgreSQL query selection string.",
+						},
+					},
+					Required: []string{"query"},
+				},
+			},
+		}
+	}
+	// ---------------------------------------------------------------------------
+
 	tracing.LogUserPrompt(sessionID, tokenHash, requestID,
 		map[string]interface{}{
 			"message_count": len(req.Messages),
@@ -349,10 +390,9 @@ func HandleChat(w http.ResponseWriter, r *http.Request, config *Config) {
 		})
 	llmStart := time.Now()
 
-	// Call LLM - pass tools as []interface{} to avoid import cycle
-	// The chat client will access tool fields which are structurally identical to mcp.Tool
+	// Call LLM - pass runtimeTools (which Go now resolves type-safely as []Tool)
 	ctx := r.Context()
-	llmResponse, err := client.Chat(ctx, chatMessages, req.Tools)
+	llmResponse, err := client.Chat(ctx, chatMessages, runtimeTools)
 	if err != nil {
 		tracing.LogError(sessionID, tokenHash, requestID,
 			"llm_chat", err)
