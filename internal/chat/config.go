@@ -206,8 +206,8 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate LLM provider
-	if c.LLM.Provider != "anthropic" && c.LLM.Provider != "openai" && c.LLM.Provider != "ollama" {
-		return fmt.Errorf("invalid llm-provider: %s (must be anthropic, openai, or ollama)", c.LLM.Provider)
+	if c.LLM.Provider != "anthropic" && c.LLM.Provider != "openai" && c.LLM.Provider != "ollama" && c.LLM.Provider != "gemini" {
+		return fmt.Errorf("invalid llm-provider: %s (must be anthropic, openai, gemini, or ollama)", c.LLM.Provider)
 	}
 
 	// Validate LLM configuration based on provider

@@ -18,7 +18,7 @@ http:
   enabled: true
   address: ":8080"
   auth:
-    enabled: true
+    enabled: false
     token_file: "./pgedge-postgres-mcp-tokens.yaml"
 
 # Primary user credential authorization profile
@@ -61,6 +61,8 @@ knowledgebase:
   embedding_provider: "ollama"
   embedding_model: "all-minilm:latest"
   embedding_ollama_url: "http://localhost:11434"
+  table_name: "vectorized_products"       # 🎯 Point it right here!
+  vector_column: "embedding"
 
 # 7. Legacy Parameter Mappings (Kept uniform to prevent collision/override glitches)
 llm:

@@ -37,6 +37,7 @@ func main() {
 	llmModel := flag.String("llm-model", "", "LLM model to use")
 	anthropicAPIKey := flag.String("anthropic-api-key", "", "API key for Anthropic")
 	openaiAPIKey := flag.String("openai-api-key", "", "API key for OpenAI")
+	geminiAPIKey := flag.String("gemini-api-key", "", "API key for Gemini")
 	ollamaURL := flag.String("ollama-url", "", "Ollama server URL (default: http://localhost:11434)")
 	noColor := flag.Bool("no-color", false, "Disable colored output")
 
@@ -97,6 +98,9 @@ func main() {
 	}
 	if *openaiAPIKey != "" {
 		cfg.LLM.OpenAIAPIKey = *openaiAPIKey
+	}
+	if *geminiAPIKey != "" { 
+		cfg.LLM.GeminiAPIKey = *geminiAPIKey
 	}
 	if *ollamaURL != "" {
 		cfg.LLM.OllamaURL = *ollamaURL
